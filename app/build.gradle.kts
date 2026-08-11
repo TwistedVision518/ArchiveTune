@@ -369,6 +369,7 @@ dependencies {
     implementation(libs.accompanist.lyrics.core)
 
     implementation("org.json:json:20240303")
+    implementation(libs.backdrop)
 }
 
 androidComponents {

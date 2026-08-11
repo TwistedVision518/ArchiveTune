@@ -10,6 +10,8 @@
 package moe.rukamori.archivetune
 
 import android.annotation.SuppressLint
+import com.kyant.backdrop.layerBackdrop
+import com.kyant.backdrop.rememberLayerBackdrop
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -999,6 +1001,9 @@ class MainActivity : ComponentActivity() {
                                 navigationItems.fastAny { it.route == navBackStackEntry?.destination?.route } &&
                                 !active
                         }
+
+                    // Liquid glass backdrop for the bottom navigation dock
+                    val navBarBackdrop = rememberLayerBackdrop()
 
                     val shouldShowHomeShuffleButton =
                         currentRoute == Screens.Home.route &&
@@ -2149,6 +2154,7 @@ class MainActivity : ComponentActivity() {
                                                 items = navigationItems,
                                                 pureBlack = pureBlack,
                                                 isPairedWithMiniPlayer = areBottomBarsPaired,
+                                                backdrop = if (pureBlack) null else navBarBackdrop,
                                                 modifier =
                                                     Modifier
                                                         .align(Alignment.BottomCenter)
@@ -2282,7 +2288,9 @@ class MainActivity : ComponentActivity() {
                                         }
                                     }
                                 },
-                                modifier = Modifier.fillMaxSize(),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .layerBackdrop(navBarBackdrop),
                             ) {
                                 var transitionDirection =
                                     AnimatedContentTransitionScope.SlideDirection.Left

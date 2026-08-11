@@ -12,6 +12,7 @@ package moe.rukamori.archivetune.ui.component
 import android.os.SystemClock
 import android.view.ViewConfiguration
 import androidx.compose.animation.Crossfade
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -41,10 +42,14 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.kyant.backdrop.LayerBackdrop
+import com.kyant.backdrop.blur
+import com.kyant.backdrop.drawBackdrop
 import moe.rukamori.archivetune.constants.NavigationBarHeight
 import moe.rukamori.archivetune.constants.NavigationBarMaxWidth
 import moe.rukamori.archivetune.ui.screens.Screens
@@ -58,6 +63,7 @@ fun FloatingNavigationToolbar(
     pureBlack: Boolean,
     modifier: Modifier = Modifier,
     isPairedWithMiniPlayer: Boolean = false,
+    backdrop: LayerBackdrop? = null,
     isSelected: (Screens) -> Boolean,
     onItemClick: (Screens, Boolean) -> Unit,
     onSearchItemDoubleClick: (() -> Unit)? = null,
@@ -75,9 +81,8 @@ fun FloatingNavigationToolbar(
                 null
             }
         } ?: MaterialTheme.shapes.extraLarge
-    val navigationContainerColor =
-        if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer
     val motionScheme = MaterialTheme.motionScheme
+
     Box(
         modifier =
             modifier
@@ -85,89 +90,138 @@ fun FloatingNavigationToolbar(
                 .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Horizontal)),
         contentAlignment = Alignment.Center,
     ) {
-        Surface(
-            modifier =
-                Modifier
-                    .widthIn(max = NavigationBarMaxWidth)
-                    .fillMaxWidth()
-                    .height(NavigationBarHeight),
-            shape = navigationShape,
-            color = navigationContainerColor,
-            tonalElevation = NavigationBarDefaults.Elevation,
-            shadowElevation = NavigationBarDefaults.Elevation,
-        ) {
-            ShortNavigationBar(
-                modifier = Modifier.fillMaxSize(),
-                containerColor = Color.Transparent,
-                contentColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSurface,
-                windowInsets = WindowInsets(0, 0, 0, 0),
-                arrangement = ShortNavigationBarArrangement.EqualWeight,
+        // When pureBlack is enabled, fall back to the original solid black Surface.
+        // Otherwise, apply the liquid glass (backdrop blur) effect.
+        if (pureBlack || backdrop == null) {
+            Surface(
+                modifier =
+                    Modifier
+                        .widthIn(max = NavigationBarMaxWidth)
+                        .fillMaxWidth()
+                        .height(NavigationBarHeight),
+                shape = navigationShape,
+                color = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer,
+                tonalElevation = NavigationBarDefaults.Elevation,
+                shadowElevation = NavigationBarDefaults.Elevation,
             ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Row(
-                        modifier =
-                            Modifier
-                                .widthIn(max = NavigationItemsMaxWidth)
-                                .fillMaxWidth()
-                                .fillMaxHeight()
-                                .padding(vertical = NavigationItemVerticalPadding),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        items.forEach { screen ->
-                            val selected = isSelected(screen)
-                            val onDoubleClick =
-                                remember(screen, onSearchItemDoubleClick) {
-                                    if (screen == Screens.Search) onSearchItemDoubleClick else null
-                                }
-                            val lastClickTime = remember(screen) { mutableLongStateOf(0L) }
-                            val onClick =
-                                remember(screen, selected, onItemClick, onDoubleClick) {
-                                    {
-                                        val currentTime = SystemClock.uptimeMillis()
-                                        val isDoubleClick =
-                                            onDoubleClick != null &&
-                                                currentTime - lastClickTime.longValue <= ViewConfiguration.getDoubleTapTimeout()
-                                        lastClickTime.longValue = if (isDoubleClick) 0L else currentTime
-                                        if (isDoubleClick) {
-                                            onDoubleClick?.invoke()
-                                            Unit
-                                        } else {
-                                            onItemClick(screen, selected)
-                                        }
-                                    }
-                                }
-
-                            ShortNavigationBarItem(
-                                selected = selected,
-                                onClick = onClick,
-                                modifier = Modifier.weight(1f),
-                                icon = {
-                                    Crossfade(
-                                        targetState = selected,
-                                        animationSpec = motionScheme.fastEffectsSpec(),
-                                        label = "navigationItemIcon",
-                                    ) { isSelected ->
-                                        Icon(
-                                            painter =
-                                                painterResource(
-                                                    if (isSelected) screen.iconIdActive else screen.iconIdInactive,
-                                                ),
-                                            contentDescription = null,
-                                        )
-                                    }
-                                },
-                                label = {
-                                    Text(
-                                        text = stringResource(screen.titleId),
-                                        maxLines = 1,
-                                    )
-                                },
-                            )
+                NavigationBarContent(
+                    items = items,
+                    pureBlack = pureBlack,
+                    motionScheme = motionScheme,
+                    isSelected = isSelected,
+                    onItemClick = onItemClick,
+                    onSearchItemDoubleClick = onSearchItemDoubleClick,
+                )
+            }
+        } else {
+            Box(
+                modifier =
+                    Modifier
+                        .widthIn(max = NavigationBarMaxWidth)
+                        .fillMaxWidth()
+                        .height(NavigationBarHeight)
+                        .clip(navigationShape)
+                        .drawBackdrop(backdrop) {
+                            blur(radius = 24.dp)
                         }
-                    }
+                        .border(
+                            width = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f),
+                            shape = navigationShape,
+                        ),
+            ) {
+                NavigationBarContent(
+                    items = items,
+                    pureBlack = false,
+                    motionScheme = motionScheme,
+                    isSelected = isSelected,
+                    onItemClick = onItemClick,
+                    onSearchItemDoubleClick = onSearchItemDoubleClick,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NavigationBarContent(
+    items: List<Screens>,
+    pureBlack: Boolean,
+    motionScheme: androidx.compose.material3.MotionScheme,
+    isSelected: (Screens) -> Boolean,
+    onItemClick: (Screens, Boolean) -> Unit,
+    onSearchItemDoubleClick: (() -> Unit)?,
+) {
+    ShortNavigationBar(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = Color.Transparent,
+        contentColor = if (pureBlack) Color.White else MaterialTheme.colorScheme.onSurface,
+        windowInsets = WindowInsets(0, 0, 0, 0),
+        arrangement = ShortNavigationBarArrangement.EqualWeight,
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Row(
+                modifier =
+                    Modifier
+                        .widthIn(max = NavigationItemsMaxWidth)
+                        .fillMaxWidth()
+                        .fillMaxHeight()
+                        .padding(vertical = NavigationItemVerticalPadding),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                items.forEach { screen ->
+                    val selected = isSelected(screen)
+                    val onDoubleClick =
+                        remember(screen, onSearchItemDoubleClick) {
+                            if (screen == Screens.Search) onSearchItemDoubleClick else null
+                        }
+                    val lastClickTime = remember(screen) { mutableLongStateOf(0L) }
+                    val onClick =
+                        remember(screen, selected, onItemClick, onDoubleClick) {
+                            {
+                                val currentTime = SystemClock.uptimeMillis()
+                                val isDoubleClick =
+                                    onDoubleClick != null &&
+                                        currentTime - lastClickTime.longValue <= ViewConfiguration.getDoubleTapTimeout()
+                                lastClickTime.longValue = if (isDoubleClick) 0L else currentTime
+                                if (isDoubleClick) {
+                                    onDoubleClick?.invoke()
+                                    Unit
+                                } else {
+                                    onItemClick(screen, selected)
+                                }
+                            }
+                        }
+
+                    ShortNavigationBarItem(
+                        selected = selected,
+                        onClick = onClick,
+                        modifier = Modifier.weight(1f),
+                        icon = {
+                            Crossfade(
+                                targetState = selected,
+                                animationSpec = motionScheme.fastEffectsSpec(),
+                                label = "navigationItemIcon",
+                            ) { isSelected ->
+                                Icon(
+                                    painter =
+                                        painterResource(
+                                            if (isSelected) screen.iconIdActive else screen.iconIdInactive,
+                                        ),
+                                    contentDescription = null,
+                                )
+                            }
+                        },
+                        label = {
+                            Text(
+                                text = stringResource(screen.titleId),
+                                maxLines = 1,
+                            )
+                        },
+                    )
                 }
             }
         }
